@@ -1,7 +1,12 @@
 package com.example.demo.controller;
 
 import com.example.demo.domain.User;
+import com.example.demo.dto.UserDTO;
+import com.example.demo.dto.search.SearchRequest;
+import com.example.demo.dto.search.SearchResponse;
+import com.example.demo.exceptions.ResponseObject;
 import com.example.demo.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,34 +16,34 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/admin")
 public class UserController {
 
     private final UserService userService;
 
-    @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
+
+    @PostMapping("/users/search-datatable")
+    public ResponseEntity<ResponseObject<SearchResponse<UserDTO>>> search(@ModelAttribute SearchRequest criteria) {
+        SearchResponse<UserDTO> result = userService.searchDatatable(criteria);
+        return ResponseEntity.ok(ResponseObject.success(result));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable Long id) {
-        return userService.getUserById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    @GetMapping("/users/{id}")
+    public ResponseEntity<ResponseObject<UserDTO>> getUserById(@PathVariable Long id) {
+        UserDTO result = userService.findById(id);
+        return ResponseEntity.ok(ResponseObject.success(result));
     }
 
-    @PostMapping
-    public ResponseEntity<User> createUser(@RequestBody User user) {
-        User createdUser = userService.createUser(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdUser);
+    @PostMapping("/users/create")
+    public ResponseEntity<ResponseObject<UserDTO>> createUser(@Valid @RequestBody UserDTO userDTO) {
+        UserDTO newUserDTO = userService.createUser(userDTO);
+        return ResponseEntity.ok(ResponseObject.success(newUserDTO));
     }
 
-    @PatchMapping("/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User userDetails) {
-        User updatedUser = userService.updateUser(id, userDetails);
-        return ResponseEntity.ok(updatedUser);
+    @PutMapping("/users/update")
+    public ResponseEntity<ResponseObject<UserDTO>> updateUser(@Valid @RequestBody UserDTO userDTO) {
+        UserDTO updatedUser = userService.updateUser(userDTO);
+        return ResponseEntity.ok(ResponseObject.success(updatedUser));
     }
 
     @DeleteMapping("/{id}")
