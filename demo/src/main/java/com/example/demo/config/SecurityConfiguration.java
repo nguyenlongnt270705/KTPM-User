@@ -73,6 +73,8 @@ public class SecurityConfiguration {
                         authorizeRequests
                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                 .requestMatchers("/api/authenticate").permitAll()
+                                .requestMatchers("/api/register").permitAll()
+                                .requestMatchers("/api/public/**").permitAll()
                                 .requestMatchers("/ws/**").permitAll()
                                 .anyRequest().authenticated()
                 )

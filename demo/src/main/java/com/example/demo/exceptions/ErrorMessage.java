@@ -9,6 +9,7 @@ public enum ErrorMessage {
     VALIDATION_ERROR("400", "Validation error"),
     CURRENT_PASSWORD_INVALID("CURRENT_PASSWORD_INVALID", "Current password invalid"),
     ACCESS_DENIED("403", "Access denied"),
+    UNHANDLED_ERROR("1004", "Unhandled error"),
 
     ;
     private final String code;

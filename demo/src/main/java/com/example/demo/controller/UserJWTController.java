@@ -4,12 +4,15 @@ import com.example.demo.domain.User;
 import com.example.demo.dto.ChangePasswordReq;
 import com.example.demo.dto.login.JWTToken;
 import com.example.demo.dto.login.LoginVM;
+import com.example.demo.dto.login.RegisterVM;
 import com.example.demo.dto.login.UserProfileDTO;
+import com.example.demo.exceptions.ErrorMessage;
 import com.example.demo.exceptions.ResponseObject;
 import com.example.demo.security.CustomUserDetails;
 import com.example.demo.security.jwt.JWTFilter;
 import com.example.demo.security.jwt.TokenProvider;
 import com.example.demo.service.AuthService;
+import com.example.demo.service.MailService;
 import com.example.demo.service.UserService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +45,7 @@ public class UserJWTController {
     private final UserService userService;
     private final AuthService authService;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
+    private final MailService mailService;
 
     @PostMapping("/authenticate")
     public ResponseEntity<JWTToken> authorize(@Valid @RequestBody LoginVM loginVM, HttpServletRequest request) {
@@ -139,7 +143,7 @@ public class UserJWTController {
             @RequestHeader(value = "Authorization", required = false) String bearerToken,
             @RequestBody(required = false) Map<String, String> requestBody
     ) {
-        if (bearerToken != null || bearerToken.startsWith("Bearer ")) {
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             String token = bearerToken.substring(7);
             tokenProvider.revokeToken(token); // Xoá access token trong Redis
         }
@@ -158,5 +162,36 @@ public class UserJWTController {
             }
         }
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<ResponseObject<String>> register(@Valid @RequestBody RegisterVM registerVM) {
+        try {
+            // Đăng ký user mới
+            userService.registerUser(
+                    registerVM.getUsername(),
+                    registerVM.getPassword(),
+                    registerVM.getFullName(),
+                    registerVM.getEmail(),
+                    registerVM.getPhone()
+            );
+
+            // Gửi email xác nhận đăng ký
+            try {
+                mailService.sendRegistrationEmail(
+                        registerVM.getEmail(),
+                        registerVM.getUsername(),
+                        registerVM.getFullName()
+                );
+            } catch (Exception e) {
+                log.warn("Failed to send registration email to: {}", registerVM.getEmail(), e);
+            }
+
+            return ResponseEntity.ok(ResponseObject.success("Registration successful. Please check your email for confirmation."));
+        } catch (Exception e) {
+            log.error("Error during registration", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseObject.error(ErrorMessage.VALIDATION_ERROR, e.getMessage()));
+        }
     }
 }

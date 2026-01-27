@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.domain.User;
 import com.example.demo.dto.ChangePasswordReq;
 import com.example.demo.dto.UserDTO;
+import com.example.demo.dto.excel.ExcelTemplateConfig;
 import com.example.demo.dto.login.UserProfileDTO;
 import com.example.demo.dto.search.SearchRequest;
 import com.example.demo.dto.search.SearchResponse;
@@ -14,6 +15,7 @@ import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.security.SecurityUtils;
 import com.example.demo.utils.CommonUtils;
+import com.example.demo.utils.ExcelBuilder;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -27,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.criteria.Predicate;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -96,9 +97,9 @@ public class UserService {
 
     public UserDTO createUser(UserDTO request) {
         // Kiểm tra username đã tồn tại chưa
-        if (userRepository.existUserByUsername(request.getUsername())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new ApiInternalException(ErrorMessage.VALIDATION_ERROR);
-        }
+    }
 
         // Tạo User entity từ UserDTO
         User user = User.builder()
@@ -115,17 +116,14 @@ public class UserService {
         // Mã hóa password từ login field (login là password ban đầu mà admin set)
         String encryptedPassword = passwordEncoder.encode(user.getLogin());
         user.setPassword(encryptedPassword);
-        
+
         // Set role nếu có
         if (ObjectUtils.isNotEmpty(request.getRoles())) {
-            Role role = roleRepository.findAllByCode(request.getRoles());
-            if (role != null) {
-                user.setRole(role);
-            } else {
-                throw new ApiInternalException(ErrorMessage.VALIDATION_ERROR);
-            }
+            Role role = roleRepository.findByRoleCode(request.getRoles())
+                    .orElseThrow(() -> new ApiInternalException(ErrorMessage.VALIDATION_ERROR));
+            user.setRole(role);
         }
-        
+
         User savedUser = userRepository.save(user);
         return UserDTO.fromEntity(savedUser);
     }
@@ -153,7 +151,7 @@ public class UserService {
         }
         if (StringUtils.isNotBlank(request.getAvatar())) {
             user.setAvatar(request.getAvatar());
-        }
+    }
         user.setActivated(request.isActivated());
         if (StringUtils.isNotBlank(request.getUserPackage())) {
             user.setUserPackage(request.getUserPackage());
@@ -161,23 +159,13 @@ public class UserService {
 
         // Update role nếu có
         if (ObjectUtils.isNotEmpty(request.getRoles())) {
-            Role role = roleRepository.findAllByCode(request.getRoles());
-            if (role != null) {
-                user.setRole(role);
-            } else {
-                throw new ApiInternalException(ErrorMessage.VALIDATION_ERROR); // Role not found
-            }
+            Role role = roleRepository.findByRoleCode(request.getRoles())
+                    .orElseThrow(() -> new ApiInternalException(ErrorMessage.VALIDATION_ERROR)); // Role not found
+            user.setRole(role);
         }
 
         userRepository.save(user);
         return UserDTO.fromEntity(user);
-    }
-
-    public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found with id: " + id);
-        }
-        userRepository.deleteById(id);
     }
 
     public void changePassword(ChangePasswordReq req) {
@@ -216,6 +204,78 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
         userRepository.save(user);
+    }
+
+    public void changeActiveUser(Long id, boolean isActive) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ApiInternalException(ErrorMessage.USER_NOT_FOUND));
+        user.setActivated(isActive);
+        userRepository.save(user);
+    }
+
+    public byte[] downloadTemplate() {
+        checkAdminPermission();
+
+        // Lấy danh sách role codes từ database
+        List<String> roleCodes = roleRepository.findAll().stream()
+                .map(Role::getRoleCode)
+                .collect(Collectors.toList());
+
+        ExcelTemplateConfig config = ExcelTemplateConfig.builder()
+                .headers(List.of("Tên đăng nhập", "Tên", "Email", "Số điện thoại", "Vai trò", "Gói"))
+                .fieldRequired(List.of(1, 2, 3)) // Index: 1=Tên đăng nhập, 2=Tên, 3=Email (không tính auto number)
+                .autoNumber(true)
+                .listValidations(new ArrayList<>())
+                .build();
+
+        // Thêm validation cho cột "Vai trò" (index 5 sau khi có auto number)
+        config.getListValidations().add(ExcelTemplateConfig.ExcelValidation.builder()
+                .rangeName("_ROLE")
+                .rowIndex(5) // Index 5 = cột "Vai trò" (sau auto number ở index 0)
+                .data(roleCodes)
+                .build()
+        );
+
+        return ExcelBuilder.buildFileTemplate(config);
+    }
+
+    public UserDTO registerUser(String username, String password, String fullName, String email, String phone) {
+        // Kiểm tra username đã tồn tại chưa
+        if (userRepository.existsByUsername(username)) {
+            throw new ApiInternalException(ErrorMessage.VALIDATION_ERROR, "Username already exists");
+        }
+
+        // Kiểm tra email đã tồn tại chưa
+        if (StringUtils.isNotBlank(email)) {
+            boolean emailExists = userRepository.findAll().stream()
+                    .anyMatch(u -> email.equalsIgnoreCase(u.getEmail()));
+            if (emailExists) {
+                throw new ApiInternalException(ErrorMessage.VALIDATION_ERROR, "Email already exists");
+            }
+        }
+
+        // Tạo User entity
+        User user = User.builder()
+                .username(username)
+                .login(username) // Set login = username cho đăng ký
+                .fullName(fullName)
+                .email(email)
+                .phone(phone)
+                .avatar(User.defaultAvt)
+                .activated(true) // Kích hoạt tài khoản ngay sau khi đăng ký
+                .build();
+
+        // Mã hóa password
+        String encryptedPassword = passwordEncoder.encode(password);
+        user.setPassword(encryptedPassword);
+
+        // Set role mặc định là USER
+        Role defaultRole = roleRepository.findByRoleCode("USER")
+                .orElseThrow(() -> new ApiInternalException(ErrorMessage.VALIDATION_ERROR, "Default USER role not found"));
+        user.setRole(defaultRole);
+
+        User savedUser = userRepository.save(user);
+        return UserDTO.fromEntity(savedUser);
     }
 }
 

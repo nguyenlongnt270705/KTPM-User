@@ -11,6 +11,7 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,6 +38,7 @@ public class TokenProvider {
     private final long tokenValidityInMillisecondsForRememberMe;
     private final long refreshTokenValidityInMilliseconds;
     private final SimpMessagingTemplate messagingTemplate;
+    @Getter
     private final RedisTokenService redisTokenService;
 
     public TokenProvider(ApplicationProperties properties, SimpMessagingTemplate messagingTemplate,
@@ -169,8 +171,7 @@ public class TokenProvider {
             String username = claims.getSubject(); // lấy JWT ID
 
             //kiểm tra token có hợp lệ không
-            boolean redisValid = redisTokenService.isTokenValid(username, authToken);
-            return redisValid;
+            return redisTokenService.isTokenValid(username, authToken);
         } catch (ExpiredJwtException | UnsupportedJwtException | MalformedJwtException | SignatureException e) {
             log.trace(INVALID_JWT_TOKEN, e);
         } catch (IllegalArgumentException e) {
@@ -184,7 +185,4 @@ public class TokenProvider {
         redisTokenService.deleteToken(claims.getId());
     }
 
-    public RedisTokenService getRedisTokenService() {
-        return redisTokenService;
-    }
 }

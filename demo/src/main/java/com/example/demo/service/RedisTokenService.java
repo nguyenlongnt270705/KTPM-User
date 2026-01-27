@@ -39,11 +39,11 @@ public class RedisTokenService {
 
     public boolean isTokenValid(String username, String token) {
 
-        return Boolean.TRUE.equals(redisTemplate.hasKey("TOKEN:" + username) && Objects.equals(redisTemplate.opsForValue().get("TOKEN:" + username), token));
+        return redisTemplate.hasKey("TOKEN:" + username) && Objects.equals(redisTemplate.opsForValue().get("TOKEN:" + username), token);
     }
 
     public void checkTokenExisted(String username, String token, long durationMinutes) {
-        if (Boolean.TRUE.equals(redisTemplate.hasKey("TOKEN:" + username))) {
+        if (redisTemplate.hasKey("TOKEN:" + username)) {
             redisTemplate.delete("TOKEN:" + username);
             redisTemplate.opsForValue().set("TOKEN:" + username, token, durationMinutes, TimeUnit.MINUTES);
         }
@@ -72,8 +72,8 @@ public class RedisTokenService {
     }
 
     public boolean isRefreshTokenValid(String username, String refreshToken) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey("REFRESH_TOKEN:" + username)
-                && Objects.equals(redisTemplate.opsForValue().get("REFRESH_TOKEN:" + username), refreshToken));
+        return redisTemplate.hasKey("REFRESH_TOKEN:" + username)
+                && Objects.equals(redisTemplate.opsForValue().get("REFRESH_TOKEN:" + username), refreshToken);
     }
 
     public void deleteRefreshToken(String username) {

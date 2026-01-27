@@ -1,6 +1,5 @@
 package com.example.demo.controller;
 
-import com.example.demo.domain.User;
 import com.example.demo.dto.UserDTO;
 import com.example.demo.dto.search.SearchRequest;
 import com.example.demo.dto.search.SearchResponse;
@@ -8,11 +7,10 @@ import com.example.demo.exceptions.ResponseObject;
 import com.example.demo.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -46,9 +44,25 @@ public class UserController {
         return ResponseEntity.ok(ResponseObject.success(updatedUser));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        this.userService.deleteUser(id);
-        return ResponseEntity.ok(null);
+    @GetMapping("/users/deactive/{id}")
+    public ResponseEntity<ResponseObject<Boolean>> deactivateUser(@PathVariable Long id) {
+        userService.changeActiveUser(id, false);
+        return ResponseEntity.ok(ResponseObject.success());
+    }
+
+    @GetMapping("/users/active/{id}")
+    public ResponseEntity<ResponseObject<Boolean>> activeUser(@PathVariable Long id) {
+        userService.changeActiveUser(id, true);
+        return ResponseEntity.ok(ResponseObject.success());
+    }
+
+    @GetMapping("/users/file-template")
+    public ResponseEntity<byte[]> downloadFileTemplate(@RequestParam("userId") String userId) {
+        String filename = userId.toLowerCase() + "_user-import-template.xlsx";
+        byte[] file = userService.downloadTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/lovephim.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
     }
 }
