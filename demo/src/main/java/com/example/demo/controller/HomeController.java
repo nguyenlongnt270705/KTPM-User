@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
 @Slf4j
-public class PublicMovieController {
+public class HomeController {
 
     private final MovieService movieService;
 

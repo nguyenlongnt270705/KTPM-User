@@ -12,6 +12,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin")
@@ -62,6 +64,16 @@ public class UserController {
         byte[] file = userService.downloadTemplate();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/lovephim.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    @PostMapping("/users/export")
+    public ResponseEntity<byte[]> exportUser(@RequestBody SearchRequest request) {
+        String fileName = "export-user-" + LocalDate.now() + ".xlsx";
+        byte[] file = userService.exportUser(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .contentType(MediaType.parseMediaType("application/lovephim.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(file);
     }

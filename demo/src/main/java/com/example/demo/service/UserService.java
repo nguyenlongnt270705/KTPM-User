@@ -19,6 +19,11 @@ import com.example.demo.utils.ExcelBuilder;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -28,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.criteria.Predicate;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -237,6 +243,93 @@ public class UserService {
         );
 
         return ExcelBuilder.buildFileTemplate(config);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportUser(SearchRequest request) {
+        // Kiểm tra quyền admin
+        checkAdminPermission();
+
+        try (XSSFWorkbook wb = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            Sheet sheet = wb.createSheet("Users");
+            CellStyle headerStyle = ExcelBuilder.createHeaderStyle(wb);
+
+            // Header
+            List<String> headers = List.of(
+                    "Username",
+                    "Full name",
+                    "Email",
+                    "Phone",
+                    "Role",
+                    "Role label",
+                    "Package",
+                    "Activated",
+                    "Created date",
+                    "Modified date"
+            );
+            ExcelBuilder.createHeaderRow(sheet, headerStyle, headers);
+
+            // Data: lấy toàn bộ user theo filter (không phân trang để export)
+            Specification<User> spec = createSpecification(request);
+            List<User> users = userRepository.findAll(spec);
+
+            int rowIndex = 1;
+            for (User u : users) {
+                Row row = sheet.createRow(rowIndex++);
+
+                // Username
+                Cell c0 = row.createCell(0);
+                c0.setCellValue(u.getUsername() != null ? u.getUsername() : "");
+
+                // Full name
+                Cell c1 = row.createCell(1);
+                c1.setCellValue(u.getFullName() != null ? u.getFullName() : "");
+
+                // Email
+                Cell c2 = row.createCell(2);
+                c2.setCellValue(u.getEmail() != null ? u.getEmail() : "");
+
+                // Phone
+                Cell c3 = row.createCell(3);
+                c3.setCellValue(u.getPhone() != null ? u.getPhone() : "");
+
+                // Role code
+                Cell c4 = row.createCell(4);
+                c4.setCellValue(u.getRole() != null && u.getRole().getRoleCode() != null ? u.getRole().getRoleCode() : "");
+
+                // Role description/label
+                Cell c5 = row.createCell(5);
+                c5.setCellValue(u.getRole() != null && u.getRole().getDescription() != null ? u.getRole().getDescription() : "");
+
+                // Package
+                Cell c6 = row.createCell(6);
+                c6.setCellValue(u.getUserPackage() != null ? u.getUserPackage() : "");
+
+                // Activated
+                Cell c7 = row.createCell(7);
+                c7.setCellValue(u.isActivated());
+
+                // Created date (string ISO)
+                Cell c8 = row.createCell(8);
+                c8.setCellValue(u.getCreatedDate() != null ? u.getCreatedDate().toString() : "");
+
+                // Modified date (string ISO)
+                Cell c9 = row.createCell(9);
+                c9.setCellValue(u.getModifiedDate() != null ? u.getModifiedDate().toString() : "");
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < headers.size(); i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new ApiInternalException(ErrorMessage.UNHANDLED_ERROR, e.getMessage());
+        }
     }
 
     public UserDTO registerUser(String username, String password, String fullName, String email, String phone) {
